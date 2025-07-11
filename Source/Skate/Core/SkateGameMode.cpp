@@ -55,6 +55,11 @@ int32 ASkateGameMode::GetScore() const
 	return Score;
 }
 
+float ASkateGameMode::GetMatchTime() const
+{
+	return MatchTime;
+}
+
 void ASkateGameMode::BeginPlay()
 {
 	Super::BeginPlay();
@@ -90,6 +95,9 @@ void ASkateGameMode::HandleGameOver()
 {
 	PlayerController->SetPlayerEnabledState(false);
 	OnMatchEnded.Broadcast();
+
+	FTimerHandle TimerHandle;
+	GetWorldTimerManager().SetTimer(TimerHandle, this, &ASkateGameMode::RestartGame, 3.f, false);
 }
 
 void ASkateGameMode::TryComputeScore()
@@ -123,5 +131,11 @@ void ASkateGameMode::ComputeScore()
 		break;
 	}
 
+	OnScoreUpdated.Broadcast();
 	UE_LOG(LogTemp, Warning, TEXT("Score updated: %d"), Score);
+}
+
+void ASkateGameMode::RestartGame()
+{
+	UGameplayStatics::OpenLevel(this, FName(*GetWorld()->GetName()));
 }
