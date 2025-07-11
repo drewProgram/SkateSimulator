@@ -11,8 +11,11 @@ class UCameraComponent;
 class UInputMappingContext;
 class UInputAction;
 struct FInputActionValue;
+class ASkateGameMode;
 
 DECLARE_LOG_CATEGORY_EXTERN(LogTemplateCharacter, Log, All);
+
+DECLARE_DELEGATE(FOnJumpEndDelegate);
 
 UCLASS(config=Game)
 class ASkateCharacter : public ACharacter
@@ -31,14 +34,35 @@ public:
 	UFUNCTION(BlueprintCallable)
 	void HandleEndJump();
 
+	virtual void Tick(float DeltaSeconds) override;
+
+	FOnJumpEndDelegate OnJumpEnd;
+
 protected:
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
 	
 	virtual void BeginPlay();
 
+	virtual void Landed(const FHitResult& Hit) override;
+
+	virtual void NotifyHit(
+		class UPrimitiveComponent* MyComp,
+		AActor* Other,
+		class UPrimitiveComponent* OtherComp,
+		bool bSelfMoved,
+		FVector HitLocation,
+		FVector HitNormal,
+		FVector NormalImpulse,
+		const FHitResult& Hit
+	) override;
+
 	void Move(const FInputActionValue& Value);
 
+	void SlowDown();
+
 	void PlayJumpMontage();
+
+	void CheckIfJumpingOverObject();
 
 private:
 	UPROPERTY(VisibleAnywhere, BlueprintGetter = GetIsJumping, Category = "Movement")
@@ -67,5 +91,7 @@ private:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Animation", meta = (AllowPrivateAccess = "true"))
 	UAnimMontage* JumpMontage;
+
+	ASkateGameMode* GameMode;
 };
 

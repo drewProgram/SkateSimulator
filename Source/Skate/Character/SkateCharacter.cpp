@@ -1,6 +1,9 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "SkateCharacter.h"
+#include "../Core/SkateGameMode.h"
+#include "../Obstacles/Obstacle.h"
+
 #include "Engine/LocalPlayer.h"
 #include "Camera/CameraComponent.h"
 #include "Components/CapsuleComponent.h"
@@ -10,19 +13,22 @@
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
 #include "InputActionValue.h"
+#include "Kismet/GameplayStatics.h"
 
 DEFINE_LOG_CATEGORY(LogTemplateCharacter);
 
 ASkateCharacter::ASkateCharacter()
 {
+	GameMode = nullptr;
+
 	// Set size for collision capsule
 	GetCapsuleComponent()->InitCapsuleSize(42.f, 96.0f);
-		
+
 	bUseControllerRotationPitch = false;
 	bUseControllerRotationYaw = true;
 	bUseControllerRotationRoll = false;
 
-	TurnSpeed = 120.f;
+	TurnSpeed = 45.f;
 
 	GetCharacterMovement()->bOrientRotationToMovement = false;
 	GetCharacterMovement()->RotationRate = FRotator(0.0f, 0.f, 0.0f);
@@ -53,7 +59,7 @@ ASkateCharacter::ASkateCharacter()
 	SkateboardMesh = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("SkateboardMesh"));
 	SkateboardMesh->SetupAttachment(GetMesh(), FName("foot_l"));
 	SkateboardMesh->SetRelativeLocation(FVector(-29.14f, -2.66f, -13.52f));
-	SkateboardMesh->SetRelativeRotation(FRotator(-184.0f, -50.f, 77.f));
+	SkateboardMesh->SetRelativeRotation(FRotator(-184.75f, 56.15f, 84.72f));
 
 	bIsJumping = false;
 }
@@ -66,11 +72,53 @@ bool ASkateCharacter::GetIsJumping() const
 void ASkateCharacter::HandleEndJump()
 {
 	bIsJumping = false;
+	OnJumpEnd.ExecuteIfBound();
+}
+
+void ASkateCharacter::Tick(float DeltaSeconds)
+{
+	Super::Tick(DeltaSeconds);
+
+
+	if (GetCharacterMovement()->IsFalling())
+	{
+		if (!GameMode->CheckObstacleWasDetected())
+		{
+			CheckIfJumpingOverObject();
+		}
+	}
 }
 
 void ASkateCharacter::BeginPlay()
 {
 	Super::BeginPlay();
+
+	if (ASkateGameMode* GM = Cast<ASkateGameMode>(UGameplayStatics::GetGameMode(this)))
+	{
+		GameMode = GM;
+	}
+	else
+	{
+		UE_LOG(LogTemplateCharacter, Error, TEXT("Failed to cast GameMode to ASkateGameMode in %s"), *GetNameSafe(this));
+	}
+
+}
+
+void ASkateCharacter::Landed(const FHitResult& Hit)
+{
+	Super::Landed(Hit);
+
+	UE_LOG(LogTemplateCharacter, Warning, TEXT("Landed!!!"));
+
+	GameMode->TryComputeScore();
+}
+
+void ASkateCharacter::NotifyHit(class UPrimitiveComponent* MyComp, AActor* Other, class UPrimitiveComponent* OtherComp, bool bSelfMoved, FVector HitLocation, FVector HitNormal, FVector NormalImpulse, const FHitResult& Hit)
+{
+	if (AObstacle* Obstacle = Cast<AObstacle>(Other))
+	{
+		GameMode->CheckTouchedDetectedObstacle(Obstacle);
+	}
 }
 
 void ASkateCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
@@ -82,9 +130,9 @@ void ASkateCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComp
 			Subsystem->AddMappingContext(DefaultMappingContext, 0);
 		}
 	}
-	
+
 	if (UEnhancedInputComponent* EnhancedInputComponent = Cast<UEnhancedInputComponent>(PlayerInputComponent)) {
-		
+
 		// Jumping
 		EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Triggered, this, &ASkateCharacter::PlayJumpMontage);
 
@@ -110,35 +158,61 @@ void ASkateCharacter::Move(const FInputActionValue& Value)
 
 		// get forward vector
 		const FVector ForwardDirection = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::X);
-	
+
 		// get right vector 
 		const FVector RightDirection = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::Y);
 
 		// add movement 
 		AddMovementInput(ForwardDirection, MovementVector.Y);
 
-		//if (MovementVector.Y != 0)
-		{
-			//AddMovementInput(RightDirection, MovementVector.X);
-		}
-
-		UE_LOG(LogTemplateCharacter, Log, TEXT("MovementVector: %s"), *MovementVector.ToString());
-
-		AddControllerYawInput(MovementVector.X * 50.f * GetWorld()->GetDeltaSeconds());
-
+		AddControllerYawInput(MovementVector.X * TurnSpeed * GetWorld()->GetDeltaSeconds());
 	}
+}
+
+void ASkateCharacter::SlowDown()
+{
+
 }
 
 void ASkateCharacter::PlayJumpMontage()
 {
 	if (JumpMontage && !bIsJumping)
 	{
-		bIsJumping = true;
 		UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
 		if (AnimInstance)
 		{
+			bIsJumping = true;
 			AnimInstance->Montage_Play(JumpMontage);
 		}
 	}
+}
+
+void ASkateCharacter::CheckIfJumpingOverObject()
+{
+	FVector Start = GetActorLocation();
+	FVector End = Start + FVector(0, 0, -300.f);
+
+	FHitResult Hit;
+	FCollisionQueryParams TraceParams;
+	TraceParams.AddIgnoredActor(this);
+
+	bool bHit = GetWorld()->LineTraceSingleByChannel(
+		Hit,
+		Start,
+		End,
+		ECC_Visibility,
+		TraceParams
+	);
+
+	if (bHit && Hit.GetActor())
+	{
+		if (AObstacle* Obstacle = Cast<AObstacle>(Hit.GetActor()))
+		{
+			UE_LOG(LogTemp, Warning, TEXT("Jumping over: %s"), *Hit.GetActor()->GetName());
+			GameMode->SetDetectedObstacle(Obstacle);
+		}
+	}
+
+	DrawDebugLine(GetWorld(), Start, End, FColor::Green, false, 1.0f);
 }
 
