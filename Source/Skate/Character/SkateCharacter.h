@@ -25,6 +25,12 @@ public:
 	FORCEINLINE class USpringArmComponent* GetCameraBoom() const { return CameraBoom; }
 	FORCEINLINE class UCameraComponent* GetFollowCamera() const { return FollowCamera; }
 
+	UFUNCTION(BlueprintCallable)
+	bool GetIsJumping() const;
+
+	UFUNCTION(BlueprintCallable)
+	void HandleEndJump();
+
 protected:
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
 	
@@ -32,9 +38,15 @@ protected:
 
 	void Move(const FInputActionValue& Value);
 
-	void Look(const FInputActionValue& Value);
+	void PlayJumpMontage();
 
 private:
+	UPROPERTY(VisibleAnywhere, BlueprintGetter = GetIsJumping, Category = "Movement")
+	bool bIsJumping;
+
+	UPROPERTY(EditAnywhere, Category = "Movement", meta = (AllowPrivateAccess = "true"))
+	float TurnSpeed;
+
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Camera, meta = (AllowPrivateAccess = "true"))
 	USpringArmComponent* CameraBoom;
 
@@ -52,5 +64,8 @@ private:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Visuals", meta = (AllowPrivateAccess = "true"))
 	USkeletalMeshComponent* SkateboardMesh;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Animation", meta = (AllowPrivateAccess = "true"))
+	UAnimMontage* JumpMontage;
 };
 

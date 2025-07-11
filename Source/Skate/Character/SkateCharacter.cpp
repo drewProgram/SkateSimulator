@@ -19,20 +19,23 @@ ASkateCharacter::ASkateCharacter()
 	GetCapsuleComponent()->InitCapsuleSize(42.f, 96.0f);
 		
 	bUseControllerRotationPitch = false;
-	bUseControllerRotationYaw = false;
+	bUseControllerRotationYaw = true;
 	bUseControllerRotationRoll = false;
 
-	GetCharacterMovement()->bOrientRotationToMovement = true;
-	GetCharacterMovement()->RotationRate = FRotator(0.0f, 500.0f, 0.0f);
+	TurnSpeed = 120.f;
 
-	GetCharacterMovement()->JumpZVelocity = 500.f;
-	GetCharacterMovement()->AirControl = 0.35f;
-	GetCharacterMovement()->MaxWalkSpeed = 1000.f;
-	GetCharacterMovement()->MaxAcceleration = 1024.f;
+	GetCharacterMovement()->bOrientRotationToMovement = false;
+	GetCharacterMovement()->RotationRate = FRotator(0.0f, 0.f, 0.0f);
+
+	GetCharacterMovement()->JumpZVelocity = 700.f;
+	GetCharacterMovement()->AirControl = 0.1f;
+	GetCharacterMovement()->FallingLateralFriction = 5.f;
+	GetCharacterMovement()->MaxWalkSpeed = 800.f;
+	GetCharacterMovement()->MaxAcceleration = 260.f;
 	//GetCharacterMovement()->MinAnalogWalkSpeed = 20.f;
-	GetCharacterMovement()->BrakingDecelerationWalking = 300.f;
-	GetCharacterMovement()->BrakingDecelerationFalling = 1500.0f;
-	GetCharacterMovement()->BrakingFriction = 0.5f;
+	GetCharacterMovement()->BrakingDecelerationWalking = 150.f;
+	GetCharacterMovement()->BrakingDecelerationFalling = 200.0f;
+	GetCharacterMovement()->BrakingFriction = 1.f;
 	GetCharacterMovement()->GroundFriction = 1.0f;
 	GetCharacterMovement()->bUseFlatBaseForFloorChecks = true;
 	GetCharacterMovement()->bMaintainHorizontalGroundVelocity = false;
@@ -40,7 +43,7 @@ ASkateCharacter::ASkateCharacter()
 
 	CameraBoom = CreateDefaultSubobject<USpringArmComponent>(TEXT("CameraBoom"));
 	CameraBoom->SetupAttachment(RootComponent);
-	CameraBoom->TargetArmLength = 400.0f;
+	CameraBoom->TargetArmLength = 420.0f;
 	CameraBoom->bUsePawnControlRotation = true;
 
 	FollowCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("FollowCamera"));
@@ -49,8 +52,20 @@ ASkateCharacter::ASkateCharacter()
 
 	SkateboardMesh = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("SkateboardMesh"));
 	SkateboardMesh->SetupAttachment(GetMesh(), FName("foot_l"));
-	SkateboardMesh->SetRelativeLocation(FVector(0.0f, 0.0f, -20.0f));
+	SkateboardMesh->SetRelativeLocation(FVector(-29.14f, -2.66f, -13.52f));
+	SkateboardMesh->SetRelativeRotation(FRotator(-184.0f, -50.f, 77.f));
 
+	bIsJumping = false;
+}
+
+bool ASkateCharacter::GetIsJumping() const
+{
+	return bIsJumping;
+}
+
+void ASkateCharacter::HandleEndJump()
+{
+	bIsJumping = false;
 }
 
 void ASkateCharacter::BeginPlay()
@@ -71,8 +86,7 @@ void ASkateCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComp
 	if (UEnhancedInputComponent* EnhancedInputComponent = Cast<UEnhancedInputComponent>(PlayerInputComponent)) {
 		
 		// Jumping
-		EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Started, this, &ACharacter::Jump);
-		EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Completed, this, &ACharacter::StopJumping);
+		EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Triggered, this, &ASkateCharacter::PlayJumpMontage);
 
 		// Moving
 		EnhancedInputComponent->BindAction(MoveAction, ETriggerEvent::Triggered, this, &ASkateCharacter::Move);
@@ -102,19 +116,29 @@ void ASkateCharacter::Move(const FInputActionValue& Value)
 
 		// add movement 
 		AddMovementInput(ForwardDirection, MovementVector.Y);
-		AddMovementInput(RightDirection, MovementVector.X);
-		FRotator NewRotation = FRotator(0.0f, CameraBoom->GetTargetRotation().Yaw, 0.0f);
-		AddControllerYawInput(MovementVector.X * 0.33f);
+
+		//if (MovementVector.Y != 0)
+		{
+			//AddMovementInput(RightDirection, MovementVector.X);
+		}
+
+		UE_LOG(LogTemplateCharacter, Log, TEXT("MovementVector: %s"), *MovementVector.ToString());
+
+		AddControllerYawInput(MovementVector.X * 50.f * GetWorld()->GetDeltaSeconds());
+
 	}
 }
 
-void ASkateCharacter::Look(const FInputActionValue& Value)
+void ASkateCharacter::PlayJumpMontage()
 {
-	FVector2D LookAxisVector = Value.Get<FVector2D>();
-
-	if (Controller != nullptr)
+	if (JumpMontage && !bIsJumping)
 	{
-		AddControllerYawInput(LookAxisVector.X);
-		AddControllerPitchInput(LookAxisVector.Y);
+		bIsJumping = true;
+		UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
+		if (AnimInstance)
+		{
+			AnimInstance->Montage_Play(JumpMontage);
+		}
 	}
 }
+
