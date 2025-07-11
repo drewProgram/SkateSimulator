@@ -45,17 +45,6 @@ protected:
 
 	virtual void Landed(const FHitResult& Hit) override;
 
-	virtual void NotifyHit(
-		class UPrimitiveComponent* MyComp,
-		AActor* Other,
-		class UPrimitiveComponent* OtherComp,
-		bool bSelfMoved,
-		FVector HitLocation,
-		FVector HitNormal,
-		FVector NormalImpulse,
-		const FHitResult& Hit
-	) override;
-
 	void Move(const FInputActionValue& Value);
 
 	void SlowDown();

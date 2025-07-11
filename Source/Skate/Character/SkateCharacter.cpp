@@ -82,8 +82,10 @@ void ASkateCharacter::Tick(float DeltaSeconds)
 
 	if (GetCharacterMovement()->IsFalling())
 	{
+		UE_LOG(LogTemplateCharacter, Warning, TEXT("Checking if jumping over an object..."));
 		if (!GameMode->CheckObstacleWasDetected())
 		{
+			UE_LOG(LogTemplateCharacter, Warning, TEXT("CheckObstacleWasDetected() false"));
 			CheckIfJumpingOverObject();
 		}
 	}
@@ -108,17 +110,18 @@ void ASkateCharacter::Landed(const FHitResult& Hit)
 {
 	Super::Landed(Hit);
 
+	if (Hit.GetActor())
+	{
+		if (AObstacle* Obstacle = Cast<AObstacle>(Hit.GetActor()))
+		{
+			GameMode->CheckTouchedDetectedObstacle(Obstacle);
+			return;
+		}
+	}
+
 	UE_LOG(LogTemplateCharacter, Warning, TEXT("Landed!!!"));
 
 	GameMode->TryComputeScore();
-}
-
-void ASkateCharacter::NotifyHit(class UPrimitiveComponent* MyComp, AActor* Other, class UPrimitiveComponent* OtherComp, bool bSelfMoved, FVector HitLocation, FVector HitNormal, FVector NormalImpulse, const FHitResult& Hit)
-{
-	if (AObstacle* Obstacle = Cast<AObstacle>(Other))
-	{
-		GameMode->CheckTouchedDetectedObstacle(Obstacle);
-	}
 }
 
 void ASkateCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
